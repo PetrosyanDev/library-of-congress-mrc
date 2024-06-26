@@ -32,3 +32,22 @@ def find_ddc(string):
 def find_integer(string, additional=""):
     match = re.search(r'\d+', string)
     return match.group()+additional if match else ""
+
+def process_line(i, line):
+    actions = {
+        1: format_text,
+        2: format_name,
+        5: find_isbn,
+        6: find_ddc,
+        7: find_integer,
+        8: lambda x: find_integer(x, additional=" cm"),
+        9: lambda _: "Book",
+        11: find_integer,
+        12: format_text,
+        13: format_text,
+        14: lambda _: "English",
+        15: lambda _: "No translation",
+        19: lambda _: "Available for circulation"
+    }
+    function = actions.get(i+1)
+    return function(line) if function else line

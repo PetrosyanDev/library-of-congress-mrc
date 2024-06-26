@@ -3,8 +3,8 @@ from CTkMessagebox import CTkMessagebox
 
 import os
 import clipboard
+
 import helpers
-import openai_text
 
 ctk.set_default_color_theme("green")
 
@@ -75,16 +75,7 @@ class App(ctk.CTk):
 
         self.updateDisplay()
 
-    def fileBrowse(self):
-        file_path = helpers.select_file()
-        if not file_path and not os.path.exists(file_path):
-            CTkMessagebox(title="Error", message="Wrong File Path!!!", icon="cancel", justify="center")
-            return
-
-        bookInfo = helpers.getBookInfo(file_path)
-        self.bookInfos.append(bookInfo)
-
-        self.updateDisplay()
+    # Frames
 
     def updateDisplay(self):
         self.clear_book_frame(self.books_frame)
@@ -100,7 +91,7 @@ class App(ctk.CTk):
             index_label.grid(row=index, column=0, pady=(10, 0), sticky="w")  # Specify row
 
             # Create title label
-            title_label = ctk.CTkLabel(self.books_frame, text=bookInfo[0])
+            title_label = ctk.CTkLabel(self.books_frame, text=bookInfo.book_name)
             title_label.grid(row=index, column=1, padx=(10, 0), pady=(10, 0), sticky="w")  # Specify row
 
             # Create button
@@ -115,17 +106,27 @@ class App(ctk.CTk):
         self.copyAllBtn = ctk.CTkButton(self, text="Copy All", height=40, command=lambda text=self.convertListToGSText(): self.copy_to_clipboard(text), font=ctk.CTkFont(size=14, weight="bold"), fg_color="#007bff", hover_color="#0062cc")
         self.copyAllBtn.grid(row=3, column=0, columnspan=4, padx=20, pady=20, sticky="nsew")
 
-    def show_detail_frame(self, bookInfo):
+    def show_main_frame(self):
+        self.detail_frame.grid_remove()
+        self.scrollable_frame.grid()
+        self.updateDisplay()
+
+    def clear_book_frame(self, frame):
+        for widgets in frame.winfo_children():
+            widgets.destroy()
+        self.copyAllBtn.destroy()
+
+    def show_detail_frame(self, bookInfo: helpers.BookInfo):
         try:
             self.scrollable_frame.grid_remove()
             self.clear_book_frame(self.detail_content_frame)
         except:
             pass
 
-        self.copy_book_detailed_button = ctk.CTkButton(self.detail_frame, text="Copy All", command=lambda text="\t".join(bookInfo): self.copy_to_clipboard(text))
+        self.copy_book_detailed_button = ctk.CTkButton(self.detail_frame, text="Copy All", command=lambda text="\t".join(bookInfo.getList()): self.copy_to_clipboard(text))
         self.copy_book_detailed_button.grid(row=0, column=1, padx=20, pady=20, sticky="nw")
 
-        for idx, info in enumerate(bookInfo):
+        for idx, info in enumerate(bookInfo.getList()):
             title = column_titles[idx]
             row_frame = ctk.CTkFrame(self.detail_content_frame)
             row_frame.grid(row=idx, column=0, pady=4, sticky="ew")
@@ -145,28 +146,8 @@ class App(ctk.CTk):
                 generateBtn.grid(row=0, column=2, padx=(10, 15), sticky="e")
 
         self.detail_frame.grid()
-    
-    def generateDescription(self, bookInfo):
-        index = self.bookInfos.index(bookInfo)
-        
-        if bookInfo[0] and bookInfo[1]:
-            prompt = f"Give me a description for {bookInfo[0]} by {bookInfo[1]}"
-        elif bookInfo[0]:
-            prompt = f"Give me a description for {bookInfo[0]}"
-        else:
-            prompt = f"Give me a description for"
-        if bookInfo[4]:
-            prompt += f" {bookInfo[4]}"
 
-        bookInfo[-1] = openai_text.GenerateText(prompt)
-        self.bookInfos[index] = bookInfo
-
-        self.show_detail_frame(bookInfo)
-
-    def show_main_frame(self):
-        self.detail_frame.grid_remove()
-        self.scrollable_frame.grid()
-        self.updateDisplay()
+    # Other
 
     def copy_to_clipboard(self, text):
         clipboard.copy(text)
@@ -175,17 +156,40 @@ class App(ctk.CTk):
         self.bookInfos.pop(index)
         self.updateDisplay()
 
-    def convertListToGSText(self):
-        return "\n".join(["\t".join(row) for row in self.bookInfos])
+    def generateDescription(self, bookInfo: helpers.BookInfo):
+        index = self.bookInfos.index(bookInfo)
+        
+        if bookInfo.book_name and bookInfo.author:
+            prompt = f"Give me a description for {bookInfo.book_name} by {bookInfo.author}"
+        elif bookInfo.book_name:
+            prompt = f"Give me a description for {bookInfo.book_name}"
+        else:
+            prompt = f"Give me a description for"
+        if bookInfo.isbn:
+            prompt += f" {bookInfo.isbn}"
 
-    def fullBook(self, index):
-        self.bookInfos.pop(index)
+        bookInfo.contents = helpers.openai_text.GenerateText(prompt)
+        self.bookInfos[index] = bookInfo
+
+        self.show_detail_frame(bookInfo)
+
+    def convertListToGSText(self):
+        return "\n".join(["\t".join(row.getList()) for row in self.bookInfos])
+
+    # File Browse
+
+    def fileBrowse(self):
+        file_path = helpers.select_file()
+        if not file_path and not os.path.exists(file_path):
+            CTkMessagebox(title="Error", message="Wrong File Path!!!", icon="cancel", justify="center")
+            return
+
+        bookInfo = helpers.getBookInfo(file_path)
+        self.bookInfos.append(bookInfo)
+
         self.updateDisplay()
 
-    def clear_book_frame(self, frame):
-        for widgets in frame.winfo_children():
-            widgets.destroy()
-        self.copyAllBtn.destroy()
+    # Closing
 
     def on_closing(self):
         self.destroy()
